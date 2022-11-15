@@ -1,0 +1,6 @@
+version: '3'
+
+places-app: 
+  image: dalenchan/places-app:latest
+  ports:
+    - 5001:80
