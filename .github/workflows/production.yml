@@ -1,9 +1,9 @@
-name: Production Workflow 
+name: Production Workflow
 
 on:
-  push: 
-  branches: 
-    - main
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
 
       - name: Run Tests
         run:  npm test -- --coverage
-    
+      
   security-checks:
     name: Run security checks
     needs: lint-test
@@ -49,7 +49,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: --severity-threshold=high
+          args: --severity-threshold=critical
   
   bump_version:
     name: Bump version
@@ -76,7 +76,7 @@ jobs:
 
   push_to_docker:
     name: Push image to docker
-    needs: [bump_version, get_commit_sha]
+    needs: [bump_version]
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -84,31 +84,29 @@ jobs:
       - name: Build and push Docker image
         uses: mr-smithers-excellent/docker-build-push@v5
         with:
-          image: dalenchan/places-app
-          tags: latest, ${{ needs.get_commit_sha.outputs.sha_output }}, ${{ needs.bump_version.outputs.new_tag }}-SNAPSHOT
+          image: astb01/places-app
+          tags: latest, ${{ needs.bump_version.outputs.new_tag }}
           registry: docker.io
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-    
-  deploy_app: 
+
+  deploy_app:
     name: Deploy to Production
     needs: [push_to_docker, bump_version]
-    setps:
-      - name: Checkout Repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm ci
       - name: Build
         run: npm run build --if-present
-      - name: Inject Version 
+      - name: Inject Version
         run: |
           echo "window['appConfig'] = {\"version\": \"${{ needs.bump_version.outputs.new_tag }}\"}" > build/app-config.js
-      - name: Deploy
+      - name: Deploy app
         uses: akhileshns/heroku-deploy@v3.12.12
         with:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_email: ${{ secrets.HEROKU_EMAIL }}
           heroku_app_name: 'places-app-prod-dalen'
-
-
-
